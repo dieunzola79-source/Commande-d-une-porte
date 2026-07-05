@@ -1,0 +1,314 @@
+
+/* =========================
+   STYLE GENERAL
+========================= */
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial, Helvetica, sans-serif;
+}
+
+body{
+    background:linear-gradient(180deg,#02143b,#001845,#021d5c);
+    min-height:100vh;
+    color:white;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:20px;
+}
+
+/* =========================
+   CONTAINER
+========================= */
+
+.container{
+    width:100%;
+    max-width:430px;
+    background:rgba(0,0,0,0.25);
+    border-radius:30px;
+    padding:25px;
+    box-shadow:0 0 25px rgba(0,0,0,0.5);
+    border:1px solid rgba(255,255,255,0.08);
+    backdrop-filter:blur(10px);
+}
+
+/* =========================
+   TITRE
+========================= */
+
+h1{
+    text-align:center;
+    font-size:55px;
+    color:#ffd000;
+    margin-bottom:10px;
+    text-shadow:0 0 15px rgba(255,208,0,0.5);
+}
+
+.subtitle{
+    text-align:center;
+    color:#bbb;
+    letter-spacing:2px;
+    margin-bottom:20px;
+}
+
+/* =========================
+   STATUS
+========================= */
+
+.status-box{
+    text-align:center;
+    margin-bottom:20px;
+    font-weight:bold;
+    font-size:20px;
+}
+
+.status-dot{
+    height:14px;
+    width:14px;
+    background:red;
+    border-radius:50%;
+    display:inline-block;
+    margin-right:8px;
+    box-shadow:0 0 10px red;
+}
+
+.online{
+    background:#00ff6a;
+    box-shadow:0 0 10px #00ff6a;
+}
+
+/* =========================
+   DATE ET HEURE
+========================= */
+
+.time-box{
+    background:rgba(0,170,255,0.15);
+    padding:15px;
+    border-radius:15px;
+    text-align:center;
+    margin-bottom:20px;
+    border:1px solid rgba(0,170,255,0.4);
+    font-size:18px;
+}
+
+/* =========================
+   BOUTON CONNEXION
+========================= */
+
+.connect-btn{
+    width:100%;
+    padding:18px;
+    border:none;
+    border-radius:18px;
+    font-size:20px;
+    font-weight:bold;
+    cursor:pointer;
+    color:white;
+    background:linear-gradient(90deg,#0066ff,#00b7ff);
+    transition:0.3s;
+    margin-bottom:30px;
+}
+
+.connect-btn:hover{
+    transform:scale(1.03);
+}
+
+/* =========================
+   WIFI BOX
+========================= */
+
+.wifi-box{
+    margin-bottom:25px;
+    background:rgba(255,255,255,0.05);
+    padding:15px;
+    border-radius:20px;
+    border:1px solid rgba(255,255,255,0.1);
+}
+
+.wifi-box h3{
+    color:#ffd000;
+    margin-bottom:10px;
+}
+
+.wifi-box input{
+    width:100%;
+    margin-top:10px;
+    padding:12px;
+    border:none;
+    border-radius:10px;
+    background:rgba(255,255,255,0.08);
+    color:white;
+    outline:none;
+}
+
+/* =========================
+   PORTE
+========================= */
+
+.door-container{
+    display:flex;
+    justify-content:center;
+    margin-top:20px;
+    perspective:1000px;
+}
+
+.door-frame{
+    width:170px;
+    height:290px;
+    padding:8px;
+    background:#777;
+    border-radius:12px;
+}
+
+.door{
+    width:100%;
+    height:100%;
+    background:linear-gradient(180deg,#00b7ff,#0066ff,#003b9b);
+    border-radius:10px;
+    position:relative;
+    transform-origin:left;
+    transition:1s;
+    box-shadow:0 0 25px rgba(0,183,255,0.4);
+}
+
+/* OUVERTURE */
+
+.door.open{
+    transform:rotateY(-70deg);
+}
+
+/* POIGNEE */
+
+.handle{
+    width:18px;
+    height:60px;
+    background:#ffd000;
+    border-radius:10px;
+    position:absolute;
+    right:15px;
+    top:110px;
+    box-shadow:0 0 10px #ffd000;
+}
+
+/* CHARNIERES */
+
+.hinge{
+    width:8px;
+    height:35px;
+    background:#222;
+    position:absolute;
+    left:5px;
+    border-radius:5px;
+}
+
+.hinge.top{
+    top:35px;
+}
+
+.hinge.bottom{
+    bottom:35px;
+}
+
+/* =========================
+   ETAT PORTE
+========================= */
+
+.door-status{
+    text-align:center;
+    margin-top:20px;
+    font-size:28px;
+    font-weight:bold;
+    color:#ddd;
+}
+
+/* =========================
+   BOUTONS
+========================= */
+
+.buttons{
+    display:flex;
+    gap:15px;
+    margin-top:25px;
+}
+
+.buttons button{
+    flex:1;
+    padding:18px;
+    border:none;
+    border-radius:18px;
+    font-size:22px;
+    font-weight:bold;
+    cursor:pointer;
+    color:white;
+    transition:0.3s;
+}
+
+.open-btn{
+    background:linear-gradient(90deg,#00a651,#00ff88);
+}
+
+.close-btn{
+    background:linear-gradient(90deg,#8b0000,#ff0033);
+}
+
+.buttons button:hover{
+    transform:scale(1.05);
+}
+
+/* =========================
+   VOIX
+========================= */
+
+.voice-btn{
+    width:100%;
+    padding:18px;
+    margin-top:25px;
+    border:none;
+    border-radius:18px;
+    background:linear-gradient(90deg,#0066ff,#4d9fff);
+    color:white;
+    font-size:22px;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+/* =========================
+   SLIDER
+========================= */
+
+.slider-box{
+    margin-top:25px;
+    background:rgba(255,255,255,0.05);
+    padding:20px;
+    border-radius:20px;
+}
+
+.slider-box h3{
+    margin-bottom:15px;
+    color:#ffd000;
+}
+
+input[type=range]{
+    width:100%;
+}
+
+.delay-value{
+    text-align:center;
+    margin-top:10px;
+    font-size:22px;
+    color:#00ffcc;
+}
+
+/* =========================
+   FOOTER
+========================= */
+
+.footer{
+    margin-top:25px;
+    text-align:center;
+    color:#999;
+    font-size:14px;
+}
