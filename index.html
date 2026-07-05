@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contrôle Porte ESP32</title>
+<link rel="stylesheet" href="index.css">
+</head>
+<body>
+<div class="container">
+
+    <!-- TITRE -->
+    <h1>Contrôle<br>Porte</h1>
+    <div class="subtitle">ESP32 - Système Intelligent</div>
+
+    <!-- STATUT -->
+    <div class="status-box">
+        <span class="status-dot" id="dot"></span>
+        <span id="statusText">HORS LIGNE</span>
+    </div>
+
+    <!-- DATE ET HEURE -->
+    <div class="time-box" id="dateTime">Chargement...</div>
+
+    <!-- BOUTON CONNEXION -->
+    <button id="connectBtn" class="connect-btn">📶 Se Connecter</button>
+
+    <!-- PORTE -->
+    <div class="door-container">
+        <div class="door-frame">
+            <div class="door" id="door">
+                <div class="hinge top"></div>
+                <div class="hinge bottom"></div>
+                <div class="handle"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ETAT PORTE -->
+    <div class="door-status" id="doorStatus">Fermée</div>
+
+    <!-- COMMANDES OUVRIR / FERMER -->
+    <div class="buttons">
+        <button id="openBtn" class="open-btn">OUVRIR</button>
+        <button id="closeBtn" class="close-btn">FERMER</button>
+    </div>
+
+    <!-- COMMANDE VOCALE -->
+    <button id="voiceBtn" class="voice-btn">🎤 Commande Vocale</button>
+
+    <!-- DELAI AUTO-FERMETURE -->
+    <div class="slider-box">
+        <h3>Délai fermeture (sec)</h3>
+        <input type="range" min="1" max="20" value="5" id="delaySlider">
+        <div class="delay-value"><span id="delayValue">5</span> secondes</div>
+    </div>
+
+    <div class="footer">Système intelligent connecté avec ESP32</div>
+</div>
+
+<script type="module">
+/* =========================
+   Sélection des éléments DOM
+========================= */
+const dot = document.getElementById('dot');
+const statusText = document.getElementById('statusText');
+const dateTimeBox = document.getElementById('dateTime');
+const doorEl = document.getElementById('door');
+const doorStatus = document.getElementById('doorStatus');
+const delaySlider = document.getElementById('delaySlider');
+const delayValue = document.getElementById('delayValue');
+const connectBtn = document.getElementById('connectBtn');
+const openBtn = document.getElementById('openBtn');
+const closeBtn = document.getElementById('closeBtn');
+const voiceBtn = document.getElementById('voiceBtn');
+
+const WIFI_SSID = 'ECO PAR 20C';
+const WIFI_PASSWORD = '22Cobra25';
+
+let connected = false;
+let recognition = null;
+let voiceActive = false;
+let firebaseDatabase = null;
+let doorRef = null;
+
+/* =========================
+   Voix synthétisée
+========================= */
+function speak(message) {
+    if (!window.speechSynthesis || !message) return;
+
+    const speakNow = () => {
+        const utterance = new SpeechSynthesisUtterance(message);
+        utterance.lang = 'fr-FR';
+        utterance.rate = 1;
+        utterance.pitch = 1;
+
+        const voices = window.speechSynthesis.getVoices();
+        const frenchVoice = voices.find((voice) => voice.lang.startsWith('fr')) || null;
+        if (frenchVoice) {
+            utterance.voice = frenchVoice;
+        }
+
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.resume();
+        window.speechSynthesis.speak(utterance);
+    };
+
+    if (window.speechSynthesis.getVoices().length === 0) {
+        window.speechSynthesis.onvoiceschanged = speakNow;
+        setTimeout(speakNow, 300);
+    } else {
+        speakNow();
+    }
+}
+
+/* =========================
+   Mise à jour date et heure
+========================= */
+function updateDateTime() {
+    const now = new Date();
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    dateTimeBox.textContent = `${now.toLocaleDateString('fr-FR', options)} - ${now.toLocaleTimeString('fr-FR')}`;
+}
+setInterval(updateDateTime, 1000);
+updateDateTime();
+
+/* =========================
+   Requêtes HTTP vers ESP32
+========================= */
+async function apiGet(path) {
+    try {
+        const resp = await fetch(path, { cache: 'no-store' });
+        if (!resp.ok) return null;
+        return await resp.text();
+    } catch (error) {
+        console.error('apiGet erreur:', error);
+        return null;
+    }
+}
+
+async function apiPost(path, body) {
+    try {
+        const resp = await fetch(path, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            cache: 'no-store'
+        });
+        if (!resp.ok) return null;
+        return await resp.json().catch(() => null);
+    } catch (error) {
+        console.error('apiPost erreur:', error);
+        return null;
+    }
+}
+
+function updateStatusLabel() {
+    statusText.textContent = connected ? 'EN LIGNE' : 'HORS LIGNE';
+}
+
+function updateDoorVisual(state) {
+    if (state === 'ouverte') {
+        doorEl.classList.add('open');
+        doorStatus.textContent = 'Ouverte';
+    } else {
+        doorEl.classList.remove('open');
+        doorStatus.textContent = 'Fermée';
+    }
+}
+
+async function syncDoorState(state, action) {
+    updateDoorVisual(state);
+    if (firebaseDatabase && doorRef) {
+        try {
+            // true pour OUVRIR, false pour FERMER
+            const boolState = (action === 'ouvrir');
+            await set(doorRef, boolState);
+        } catch (error) {
+            console.error('Erreur Firebase:', error);
+        }
+    }
+}
+
+/* =========================
+   Connexion Wi-Fi
+========================= */
+async function connectWifi() {
+    const ssid = WIFI_SSID;
+    const password = WIFI_PASSWORD;
+
+    statusText.textContent = 'Connexion en cours...';
+    dot.classList.remove('online');
+
+    const resp = await apiPost('/connect', { ssid, password });
+    connected = Boolean(resp && resp.status === 'ok');
+
+    if (connected) {
+        dot.classList.add('online');
+        updateStatusLabel();
+        speak('Connexion Wi-Fi demandée');
+    } else {
+        dot.classList.remove('online');
+        updateStatusLabel();
+        speak('Impossible de se connecter');
+    }
+}
+
+/* =========================
+   Ouvrir la porte
+========================= */
+async function openDoor() {
+    await apiGet('/api/porte/ouvrir');
+    await syncDoorState('ouverte', 'ouvrir');
+    speak('Vous avez ouvert votre porte');
+}
+
+/* =========================
+   Fermer la porte
+========================= */
+async function closeDoor() {
+    await apiGet('/api/porte/fermer');
+    await syncDoorState('fermée', 'fermer');
+    speak('Vous avez fermé votre porte');
+}
+
+/* =========================
+   Délai d'auto-fermeture
+========================= */
+async function setDelay(seconds) {
+    delayValue.textContent = seconds;
+    await apiGet(`/api/porte/delai?secondes=${encodeURIComponent(seconds)}`);
+}
+
+/* =========================
+   Commande vocale (toggle)
+========================= */
+function setVoiceButtonState(active) {
+    if (!voiceBtn) return;
+    voiceBtn.classList.toggle('active', active);
+    voiceBtn.textContent = active ? '🎤 Commande Vocale Activée' : '🎤 Commande Vocale';
+}
+
+function stopVoiceRecognition(message = 'La commande vocale est désactivée') {
+    voiceActive = false;
+    if (recognition) {
+        try {
+            recognition.onstart = null;
+            recognition.onresult = null;
+            recognition.onerror = null;
+            recognition.onend = null;
+            recognition.stop();
+        } catch (err) {
+            console.error('stop error', err);
+        }
+        recognition = null;
+    }
+    setVoiceButtonState(false);
+    updateStatusLabel();
+    speak(message);
+}
+
+function startVoiceRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert('La commande vocale n\'est pas supportée par ce navigateur.');
+        return;
+    }
+
+    if (recognition) {
+        try { recognition.stop(); } catch (err) { console.error('stop error', err); }
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = 'fr-FR';
+    recognition.interimResults = false;
+    recognition.continuous = true;
+
+    recognition.onstart = () => {
+        voiceActive = true;
+        statusText.textContent = 'Écoute...';
+        setVoiceButtonState(true);
+    };
+
+    recognition.onresult = async (event) => {
+        const command = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+        const openCommands = ['ouvrir', 'ouvre'];
+        const closeCommands = ['fermer', 'ferme', 'fermez', 'fermé'];
+
+        if (openCommands.some((k) => command.includes(k))) {
+            await apiGet('/api/porte/commande?action=ouvrir');
+            await openDoor();
+        } else if (closeCommands.some((k) => command.includes(k))) {
+            await apiGet('/api/porte/commande?action=fermer');
+            await closeDoor();
+        } else if (command.includes('désactive') || command.includes('desactive')) {
+            stopVoiceRecognition('La commande vocale est désactivée');
+        } else {
+            speak('Commande non autorisée. Dites ouvrir ou fermer.');
+        }
+    };
+
+    recognition.onerror = () => {
+        updateStatusLabel();
+    };
+
+    recognition.onend = () => {
+        if (voiceActive && recognition) {
+            try { recognition.start(); } catch (err) { console.error('restart error', err); }
+        } else {
+            updateStatusLabel();
+        }
+    };
+
+    try {
+        recognition.start();
+        speak('La commande vocale est activée');
+    } catch (err) {
+        console.error('start error', err);
+        stopVoiceRecognition('Impossible de démarrer la commande vocale');
+    }
+}
+
+function toggleVoice() {
+    if (voiceActive) {
+        stopVoiceRecognition();
+    } else {
+        startVoiceRecognition();
+    }
+}
+
+/* =========================
+   Événement du slider
+========================= */
+if (delaySlider) {
+    delaySlider.addEventListener('input', () => setDelay(delaySlider.value));
+    delayValue.textContent = delaySlider.value;
+}
+
+connectBtn?.addEventListener('click', connectWifi);
+openBtn?.addEventListener('click', () => {
+    openDoor();
+});
+closeBtn?.addEventListener('click', () => {
+    closeDoor();
+});
+voiceBtn?.addEventListener('click', toggleVoice);
+
+/* =========================
+   base de données Firebase
+========================= */
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js';
+import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey: 'AIzaSyA1BIR0rH7OJfcwlYl6unJNzSXltbYORTU',
+  authDomain: 'porte-automatique.firebaseapp.com',
+  databaseURL: 'https://porte-automatique-default-rtdb.firebaseio.com',
+  projectId: 'porte-automatique',
+  storageBucket: 'porte-automatique.firebasestorage.app',
+  messagingSenderId: '382872965075',
+  appId: '1:382872965075:web:78c4434ceba20a683ae926',
+  measurementId: 'G-J5GMTQKJPK'
+};
+
+const app = initializeApp(firebaseConfig);
+firebaseDatabase = getDatabase(app);
+
+// Arborescence configurée sur la clé exacte : etat_porte
+doorRef = ref(firebaseDatabase, 'etat_porte');
+
+// Écoute des changements de l'état booléen (true/false) pour mettre à jour l'affichage
+onValue(doorRef, (snapshot) => {
+    const isOpen = snapshot.val();
+    if (isOpen === true) {
+        updateDoorVisual('ouverte');
+    } else if (isOpen === false) {
+        updateDoorVisual('fermée');
+    }
+});
+</script>
+</body>
+</html>
